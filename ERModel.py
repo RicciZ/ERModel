@@ -3,9 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class ERModel(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, num_classes, dropout_cnn = 0.5, dropout_lstm = 0.8,
-                    kernel_size_pool = 5, stride_pool = 4):
+    def __init__(self, input_size, hidden_size, num_layers, num_classes, device, use_hrv,
+            dropout_cnn = 0.5, dropout_lstm = 0.8, kernel_size_pool = 5, stride_pool = 4):
         super(ERModel, self).__init__()
+        self.device = device
+        self.use_hrv = use_hrv
         # CNN stream
         self.conv1 = nn.Conv1d(in_channels=2, out_channels=8, kernel_size=3, padding=1)
         self.conv2 = nn.Conv1d(in_channels=8, out_channels=16, kernel_size=3, padding=1)
@@ -21,15 +23,22 @@ class ERModel(nn.Module):
         self.blstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, bidirectional=True)
         self.fc1 = nn.Linear(hidden_size*2 + 64*int((input_size-kernel_size_pool)/4+1), 256)
         self.fc2 = nn.Linear(256, 32)
-        self.fc3 = nn.Linear(32, num_classes)
+        if self.use_hrv:
+            self.fc3 = nn.Linear(36, num_classes)
+        else:
+            self.fc3 = nn.Linear(32, num_classes)
         self.bn1 = nn.BatchNorm1d(256)
         self.bn2 = nn.BatchNorm1d(32)
 
 
     def forward(self, x):
+        if self.use_hrv:
+            x_hrv = x[:,:,-2:]
+            x = x[:,:,:-2]
+            print(x_hrv.shape,x.shape)
         # BLSTM stream
-        h0 = torch.zeros(self.num_layers*2, x.size(0), self.hidden_size).to(device)
-        c0 = torch.zeros(self.num_layers*2, x.size(0), self.hidden_size).to(device)
+        h0 = torch.zeros(self.num_layers*2, x.size(0), self.hidden_size).to(self.device)
+        c0 = torch.zeros(self.num_layers*2, x.size(0), self.hidden_size).to(self.device)
         out, _ = self.blstm(x, (h0, c0))
         out = self.dropout_lstm(out[:, -1, :])
 
@@ -49,12 +58,16 @@ class ERModel(nn.Module):
         x = torch.cat((x,out),1)
         x = F.relu(self.bn1(self.fc1(x)))
         x = F.relu(self.bn2(self.fc2(x)))
+        print(x.shape)
+        x = torch.cat((x, x_hrv.reshape(x_hrv.shape[0], -1)),1)
+        print(x.shape)
         x = self.fc3(x)
 
         return x
 
 # test the dim of the model
-# model = ERModel(input_size, hidden_size, num_layers, num_classes).to(device)
-# x = torch.randn(32, 2, 10000).to(device)
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# model = ERModel(10000, 512, 2, 3, device, True).to(device)
+# x = torch.randn(32, 2, 10002).to(device)
 # print(model(x).shape)
 # exit()

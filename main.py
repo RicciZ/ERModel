@@ -26,38 +26,19 @@ def collate_fn(data):
     x_ecg = torch.nn.utils.rnn.pad_sequence(x_ecg, batch_first=True, padding_value=0)
     return x_ecg, y_label
 
-def save_checkpoint(state, filename="checkpoint/my_checkpoint2.pth.tar"):
+def save_checkpoint(state, filename):
     print("=> Saving checkpoint")
     torch.save(state, filename)
 
-def load_checkpoint(checkpoint):
+def load_checkpoint(filename):
     print("=> Loading checkpoint")
+    checkpoint = torch.load(filename)
     model.load_state_dict(checkpoint['state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer'])
 
-def dataset_init(trunc_len):
-    dataset = DREAMER(trunc_len)
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [380, 34])
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
-    # test the dataset
-    # for batch_idx, (data, targets) in enumerate(train_loader):
-    #     print("test the dataset loading process")
-    #     print(data.shape)
-    #     print(targets.shape)
-    #     exit()
-
-
 def train(args):
-    # init dataset
-    dataset_init(args.input_size)
-
-    # Set device
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     # init network
-    model = ERModel(args.input_size, args.hidden_size, args.num_layers, num_classes).to(device)
+    model = ERModel(args.input_size, args.hidden_size, args.num_layers, num_classes, device, args.use_hrv).to(device)
 
     # loss and optimizer
     criterion = nn.MSELoss()
@@ -65,7 +46,7 @@ def train(args):
 
     # load model
     if args.load_model:
-        load_checkpoint(torch.load("checkpoint/my_checkpoint.pth.tar"))
+        load_checkpoint(os.path.join('checkpoint', args.exp_name, 'my_checkpoint.pth.tar'))
 
     # train
     for epoch in range(args.num_epochs):
@@ -76,7 +57,7 @@ def train(args):
                 'state_dict': model.state_dict(),
                 'optimizer': optimizer.state_dict()
             }
-            save_checkpoint(checkpoint)
+            save_checkpoint(checkpoint, os.path.join('checkpoint', args.exp_name, 'my_checkpoint.pth.tar'))
 
         for batch_idx, (data, targets) in enumerate(train_loader):
             # transfer data to gpu
@@ -130,7 +111,11 @@ def check_accuracy(loader, model, train=True):
 if __name__ == "__main__":
     # Parameters
     num_classes = 3
-
+    
+    # Set device
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     # Training settings
     parser = argparse.ArgumentParser(description='Emotion Recognition')
     parser.add_argument('--exp_name', type=str, default=None, help='Name of the experiment')
@@ -140,11 +125,27 @@ if __name__ == "__main__":
     parser.add_argument('--num_epochs', type=int, default=2000, help='number of epochs')
     parser.add_argument('--load_model', type=bool, default=False, help='load model or not')
     parser.add_argument('--lr', type=int, default=0.001, help='learning rate')
+    parser.add_argument('--use_hrv', type=bool, default=True, help='use hrv info or not')
 
     args = parser.parse_args()
+    args.exp_name = '_'.join([f'{k}[{v}]' for k, v in args.__dict__.items() if v != None])
 
+    # init dataset
+    dataset = DREAMER(args.input_size, args.use_hrv)
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [380, 34])
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
+    # test the dataset
+    # for batch_idx, (data, targets) in enumerate(train_loader):
+    #     print("test the dataset loading process")
+    #     print(data.shape)
+    #     print(targets.shape)
+    #     exit()
+    
+    # train
     model = train(args)
-
+    
+    # test
     check_accuracy(train_loader, model, train=True)
     check_accuracy(test_loader, model, train=False)
 

@@ -1,0 +1,9 @@
+'negative', 'negative feelings', 'normal', 'not angry - agressive', 'not calming', 'not happy', 'not likeable', 'not recommended', 'not sad',
+
+
+calmness:[acoustic guitar, ambient sounds, boring, calming, cleaning the house, driving, going to sleep, light, light beat, mellow, piano, relax
+anger:[aggressive, angry, distorted electric guitar, metal, negative]
+happiness:[cheerful, country, danceable, energy, hanging with friends, happy, jazz, lighthearted, minor, pleasant, romantic]
+fear:[depressed, cold,uptight]
+sadness:[emotional vocals, low energy, morose, r&b, sad, unpleasant]
+excitement:[arousing, exciting, heavy beat, party]

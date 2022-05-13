@@ -35,7 +35,7 @@ class ERModel(nn.Module):
         if self.use_hrv:
             x_hrv = x[:,:,-2:]
             x = x[:,:,:-2]
-            print(x_hrv.shape,x.shape)
+            # print(x_hrv.shape,x.shape)
         # BLSTM stream
         h0 = torch.zeros(self.num_layers*2, x.size(0), self.hidden_size).to(self.device)
         c0 = torch.zeros(self.num_layers*2, x.size(0), self.hidden_size).to(self.device)
@@ -58,9 +58,9 @@ class ERModel(nn.Module):
         x = torch.cat((x,out),1)
         x = F.relu(self.bn1(self.fc1(x)))
         x = F.relu(self.bn2(self.fc2(x)))
-        print(x.shape)
+        # print(x.shape)
         x = torch.cat((x, x_hrv.reshape(x_hrv.shape[0], -1)),1)
-        print(x.shape)
+        # print(x.shape)
         x = self.fc3(x)
 
         return x

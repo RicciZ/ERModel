@@ -36,6 +36,34 @@ def load_checkpoint(filename):
     model.load_state_dict(checkpoint['state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer'])
 
+class Metric(object):
+    def __init__(self):
+        self.acc = 0
+        self.loss = 0
+        self.count = 0
+        self.tp, self.tn, self.fp, self.fn = 0, 0, 0, 0
+    
+    def update(self, y, y_):
+        y = (y >= 3).long()
+        y_ = (y_ >= 3).long()
+        self.tp += sum(y_[y == 1] == 1)
+        self.tn += sum(y_[y == 0] == 0)
+        self.fp += sum(y_[y == 0] == 1)
+        self.fn += sum(y_[y == 1] == 0)
+        self.count += len(y)
+    
+    def printinfo(self):
+        print(f"tp={self.tp}, tn={self.tn}, fp={self.fp}, fn={self.fn}, count={self.count}")
+
+    def f1(self):
+        precision = self.tp/(self.tp + self.fp + 0.001)
+        recall = self.tp/(self.tp + self.fn + 0.001)
+        return 2*precision*recall / (precision + recall + 0.001)
+    
+    def acc(self):
+        return self.tp/self.count
+    
+    
 def train(args):
     # init network
     model = ERModel(args.input_size, args.hidden_size, args.num_layers, num_classes, device, args.use_hrv).to(device)
@@ -57,7 +85,7 @@ def train(args):
                 'state_dict': model.state_dict(),
                 'optimizer': optimizer.state_dict()
             }
-            save_checkpoint(checkpoint, os.path.join('checkpoint', args.exp_name, 'my_checkpoint.pth.tar'))
+            save_checkpoint(checkpoint, os.path.join('checkpoint/my_checkpoint.pth.tar'))
 
         for batch_idx, (data, targets) in enumerate(train_loader):
             # transfer data to gpu
@@ -76,19 +104,21 @@ def train(args):
             # gradient descent or adam step
             optimizer.step()
         
-        if epoch % 10 == 0:
-            mean_loss = sum(losses)/len(losses)
-            print(f"Loss at epoch {epoch} was {mean_loss:.5f}")
+        # if epoch % 10 == 0:
+        mean_loss = sum(losses)/len(losses)
+        print(f"Loss at epoch {epoch} was {mean_loss:.5f}")
 
     return model
 
-# check accuracy on training
 def check_accuracy(loader, model, train=True):
     if train:
         print("Checking accuracy on training data")
     else:
         print("Checking accuracy on testing data")
 
+    metric_val = Metric()
+    metric_aro = Metric()
+    metric_dom = Metric()
     mse_sum = 0
     num_samples = 0
     model.eval() # set model to evaluation mode
@@ -96,14 +126,21 @@ def check_accuracy(loader, model, train=True):
     # don't compute the gradient in this step
     with torch.no_grad(): 
         for x, y in loader:
-            # x = x.to(device).squeeze(1)
             x = x.permute(0,2,1).float().to(device)
             y = y.float().to(device)
             y_hat = model(x)
+            metric_val.update(y[:,0], y_hat[:,0])
+            metric_aro.update(y[:,1], y_hat[:,1])
+            metric_dom.update(y[:,2], y_hat[:,2])
             mse_sum += torch.sum(torch.mean((y_hat-y)**2,1))
-            num_samples += y_hat.size(0)
-
-        print(f"Got mean mse {mse_sum/num_samples:.2f}")
+            num_samples += y_hat.shape[0]
+            # metric_val.printinfo()
+            # metric_aro.printinfo()
+            # metric_dom.printinfo()
+        
+        print(f"accuracy: {(metric_val.acc(), metric_aro.acc(), metric_dom.acc())}")
+        print(f"f1 score: {(metric_val.f1(), metric_aro.f1(), metric_dom.f1())}")
+        print(f"mean mse: {mse_sum/num_samples:.2f}")
 
     model.train() # set back to train mode
 

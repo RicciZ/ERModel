@@ -1,3 +1,4 @@
+# Emotion Recognition Model
 ## Environment
 ```bash
 # python env
@@ -16,52 +17,38 @@ conda install -c conda-forge pandas
 conda install -c anaconda networkx
 ```
 
-## Server
-### open notebook on the server via browser
-```bash
-# 1. open notebook on the server
-#    --ip=0.0.0.0 means visit with any ip
-#    --no-browser means open without browser
-#    --port=XXXX open with specific port you want
-jupyter notebook --ip=0.0.0.0 --no-browser --port=XXXX
-
-# 2. connect local port YYYY to the server port XXXX
-ssh -N -f -L localhost:YYYY:localhost:XXXX remoteuser@remotehost
-
-# 3. visit localhost:YYYY via broser locally
-```
-
-## TMUX
-|      shortcut key & command            |      function                                |
-|:--------------------------------------:|:--------------------------------------------:|
-| Ctrl + b + [                           | to see history (q to exit)                   |
-| Ctrl + b + d                           | detach                                       |
-| Ctrl + d                               | directly exit and kill current session       |
-| Ctrl + b + s                           | list the sessions                            |
-| Ctrl + b + $                           | rename current session                       |
-| Ctrl + b + %                           | split window left and right                  |
-| Ctrl + b + "                           | split window up and down                     |
-| Ctrl + b + <arrow key>                 | switch cursor to other panes                 |
-| Ctrl + b + x                           | close current pane                           |
-| Ctrl + b + q                           | display pane number                          |
-| Ctrl + b + $                           | rename current session                       |
-| Ctrl + b + %                           | split window left and right                  |
-| tmux ls                                | see the tmux info                            |
-| tmux new -s <session-name>             | create session                               |
-| tmux a -t <session-name>               | attach to a session                          |
-| tmux kill-session -t <session-name>    | kill a session                               |
-
-
-
 
 ## Train
-### GPU Use
-```bash
-# check GPU info
-nvidia-smi
-# Specify the GPU we want to use 
-# e.g. to use GPU no. 2 to run train.py
-CUDA_VISIBLE_DEVICES=2 python train.py
-```
+To train the Emotion Recognition Model, run the following codes. 
+
+    $ python main.py [-h] [--exp_name EXP_NAME] [--input_size INPUT_SIZE] 
+                    [--num_layers NUM_LAYERS] [--hidden_size HIDDEN_SIZE] 
+                    [--num_epochs NUM_EPOCHS] [--load_model LOAD_MODEL] 
+                    [--lr LR] [--use_hrv USE_HRV]
+
+        optional arguments:
+            -h, --help                  show this help message and exit
+            --exp_name EXP_NAME         Name of the experiment
+            --input_size INPUT_SIZE     input size
+            --num_layers NUM_LAYERS     num of layers for blstm
+            --hidden_size HIDDEN_SIZE   hidden size for blstm
+            --num_epochs NUM_EPOCHS     number of epochs
+            --load_model LOAD_MODEL     load model or not
+            --lr LR                     learning rate
+            --use_hrv USE_HRV           use hrv info or not
+
+
+## Server
+To run the well trained Emotion Recognition Model on server, run the following codes. It will take input ECG file and output the corresponding emotion and recommended music types in a txt file. 
+
+    $ python ERonServer.py [-h] [--ecg_file ECG_FILE]
+
+        Emotion Recognition on Server
+
+        optional arguments:
+            -h, --help              show this help message and exit
+            --ecg_file ECG_FILE     the path of the input ecg file
+
+
 
 

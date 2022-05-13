@@ -87,6 +87,15 @@ class ERonServer:
         device = torch.device("cpu")
         self.model = ERModel(self.input_size, hidden_size, num_layers, num_classes, device, use_hrv).to(device)
         self.load_checkpoint(os.path.join('checkpoint/my_checkpoint.pth.tar'))
+        self.emotion = ['calmness', 'happiness', 'fear', 'sadness', 'anger', 'excitement']
+        # init tags
+        self.tags = {}
+        self.tags['calmness'] = ['acoustic guitar', 'ambient sounds', 'boring', 'calming', 'cleaning the house', 'driving', 'going to sleep', 'light', 'light beat', 'mellow', 'piano', 'relax']
+        self.tags['happiness'] = ['cheerful', 'country', 'danceable', 'energy', 'hanging with friends', 'happy', 'jazz', 'lighthearted', 'minor', 'pleasant', 'romantic']
+        self.tags['fear'] = ['depressed', 'cold', 'uptight']
+        self.tags['sadness'] = ['emotional vocals', 'low energy', 'morose', 'r&b', 'sad', 'unpleasant']
+        self.tags['anger'] = ['aggressive', 'angry', 'distorted electric guitar', 'metal', 'negative']
+        self.tags['excitement'] = ['arousing', 'exciting', 'heavy beat', 'party']
     
 
     def load_checkpoint(self, filename):
@@ -129,9 +138,14 @@ class ERonServer:
         
         return out
 
-    
-    def map_emo_tag(self, emo):
-        tag = None
+
+    def get_tag(self, emo):
+        tag = []
+        first, second = np.argsort(emo)[::-1][:2]
+        tag.extend(self.tags[self.emotion[first]])
+        s = self.tags[self.emotion[second]]
+        idx = np.random.choice(len(s), int(emo[second]/emo[first]*len(s)), replace=False)
+        tag.extend([s[i] for i in idx])
         return tag
 
 
@@ -142,9 +156,22 @@ if __name__ == "__main__":
     
     model = ERonServer()
     emo = model.get_emo(args.ecg_file)
+    tag = model.get_tag(emo)
+
+    emo_prob = {}
+    for i in range(len(emo)):
+        emo_prob[model.emotion[i]] = emo[i]
+    
+    f = open("ER_output.txt","w")
+    f.write("emotion:\n")
+    f.write(str(emo_prob)+"\n")
+    f.write("tags:\n")
+    f.write(str(tag)+"\n")
+    f.close()
 
     # test example
     # emo = model.get_emo("user_ecg/2022_5_18_13_49.csv")
 
-    print(emo)
+    # print(emo)
+    # print(tag)
 

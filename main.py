@@ -70,8 +70,8 @@ def train(args):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     # load model
-    if args.load_model:
-        load_checkpoint(os.path.join('checkpoint', args.exp_name, 'my_checkpoint.pth.tar'))
+    # if args.load_model:
+    #     load_checkpoint(os.path.join('checkpoint', args.exp_name, 'my_checkpoint.pth.tar'))
 
     # train
     for epoch in range(args.num_epochs):
@@ -100,10 +100,11 @@ def train(args):
 
             # gradient descent or adam step
             optimizer.step()
-        
-        # if epoch % 10 == 0:
-        mean_loss = sum(losses)/len(losses)
-        print(f"Loss at epoch {epoch} was {mean_loss:.5f}")
+
+        if epoch % 10 == 0:
+            mean_loss = sum(losses)/len(losses)
+            print(f"Loss at epoch {epoch} was {mean_loss:.5f}")
+            res_train.append(mean_loss)
 
     return model
 
@@ -138,6 +139,10 @@ def check_accuracy(loader, model, train=True):
         print(f"accuracy: {(metric_val.acc(), metric_aro.acc(), metric_dom.acc())}")
         print(f"f1 score: {(metric_val.f1(), metric_aro.f1(), metric_dom.f1())}")
         print(f"mean mse: {mse_sum/num_samples:.2f}")
+    res_test["accuracy"] = (metric_val.acc(), metric_aro.acc(), metric_dom.acc())
+    res_test["f1_score"] = (metric_val.f1(), metric_aro.f1(), metric_dom.f1())
+    res_test["mean_mse"] = mse_sum/num_samples
+
 
     model.train() # set back to train mode
 
@@ -158,7 +163,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_layers', type=int, default=2, help='num of layers for blstm')
     parser.add_argument('--hidden_size', type=int, default=512, help='hidden size for blstm')
     parser.add_argument('--num_epochs', type=int, default=2000, help='number of epochs')
-    parser.add_argument('--load_model', type=bool, default=False, help='load model or not')
+    # parser.add_argument('--load_model', type=bool, default=False, help='load model or not')
     parser.add_argument('--lr', type=int, default=0.001, help='learning rate')\
 
     args = parser.parse_args()
@@ -177,9 +182,17 @@ if __name__ == "__main__":
     #     exit()
     
     # train
+    res_train = []
     model = train(args)
     
-    # test
-    check_accuracy(train_loader, model, train=True)
-    check_accuracy(test_loader, model, train=False)
+    # test and output the results
+    filename = "results/" + args.exp_name + ".txt"
+    with open(filename, "w") as f:
+        f.write(str(res_train)+"\n")
+        res_test = {}
+        check_accuracy(train_loader, model, train=True)
+        f.write(str(res_test)+"\n")
+        check_accuracy(test_loader, model, train=False)
+        f.write(str(res_test)+"\n")
+
 

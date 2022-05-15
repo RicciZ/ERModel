@@ -58,7 +58,7 @@ class Metric(object):
         return 2*precision*recall / (precision + recall + 0.001)
     
     def acc(self):
-        return self.tp/self.count
+        return (self.tp+self.tn)/self.count
     
     
 def train(args):

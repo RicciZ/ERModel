@@ -10,7 +10,6 @@ import torchvision.transforms as transforms
 from dataset import DREAMER
 from ERModel import ERModel
 
-batch_size = 32
 
 # Load data
 # test model using MNIST
@@ -38,8 +37,6 @@ def load_checkpoint(filename):
 
 class Metric(object):
     def __init__(self):
-        self.acc = 0
-        self.loss = 0
         self.count = 0
         self.tp, self.tn, self.fp, self.fn = 0, 0, 0, 0
     
@@ -66,7 +63,7 @@ class Metric(object):
     
 def train(args):
     # init network
-    model = ERModel(args.input_size, args.hidden_size, args.num_layers, num_classes, device, args.use_hrv).to(device)
+    model = ERModel(args.input_size, args.hidden_size, args.num_layers, num_classes, device).to(device)
 
     # loss and optimizer
     criterion = nn.MSELoss()
@@ -156,22 +153,22 @@ if __name__ == "__main__":
     # Training settings
     parser = argparse.ArgumentParser(description='Emotion Recognition')
     parser.add_argument('--exp_name', type=str, default=None, help='Name of the experiment')
-    parser.add_argument('--input_size', type=int, default=60000, help='input size')
+    parser.add_argument('--batch_size', type=int, default=32, help='batch size')
+    parser.add_argument('--input_size', type=int, default=500, help='input size')
     parser.add_argument('--num_layers', type=int, default=2, help='num of layers for blstm')
     parser.add_argument('--hidden_size', type=int, default=512, help='hidden size for blstm')
     parser.add_argument('--num_epochs', type=int, default=2000, help='number of epochs')
     parser.add_argument('--load_model', type=bool, default=False, help='load model or not')
-    parser.add_argument('--lr', type=int, default=0.001, help='learning rate')
-    parser.add_argument('--use_hrv', type=bool, default=True, help='use hrv info or not')
+    parser.add_argument('--lr', type=int, default=0.001, help='learning rate')\
 
     args = parser.parse_args()
     args.exp_name = '_'.join([f'{k}[{v}]' for k, v in args.__dict__.items() if v != None])
 
     # init dataset
-    dataset = DREAMER(args.input_size, args.use_hrv)
+    dataset = DREAMER(args.input_size)
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [380, 34])
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=True)
     # test the dataset
     # for batch_idx, (data, targets) in enumerate(train_loader):
     #     print("test the dataset loading process")
@@ -185,5 +182,4 @@ if __name__ == "__main__":
     # test
     check_accuracy(train_loader, model, train=True)
     check_accuracy(test_loader, model, train=False)
-
 

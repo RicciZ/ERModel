@@ -12,11 +12,10 @@ import torchvision.transforms as transforms
 
 
 class ERModel(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, num_classes, device, use_hrv,
+    def __init__(self, input_size, hidden_size, num_layers, num_classes, device,
             dropout_cnn = 0.5, dropout_lstm = 0.8, kernel_size_pool = 5, stride_pool = 4):
         super(ERModel, self).__init__()
         self.device = device
-        self.use_hrv = use_hrv
         # CNN stream
         self.conv1 = nn.Conv1d(in_channels=2, out_channels=8, kernel_size=3, padding=1)
         self.conv2 = nn.Conv1d(in_channels=8, out_channels=16, kernel_size=3, padding=1)
@@ -32,19 +31,14 @@ class ERModel(nn.Module):
         self.blstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, bidirectional=True)
         self.fc1 = nn.Linear(hidden_size*2 + 64*int((input_size-kernel_size_pool)/4+1), 256)
         self.fc2 = nn.Linear(256, 32)
-        if self.use_hrv:
-            self.fc3 = nn.Linear(36, num_classes)
-        else:
-            self.fc3 = nn.Linear(32, num_classes)
+        self.fc3 = nn.Linear(36, num_classes)
         self.bn1 = nn.BatchNorm1d(256)
         self.bn2 = nn.BatchNorm1d(32)
 
 
     def forward(self, x):
-        if self.use_hrv:
-            x_hrv = x[:,:,-2:]
-            x = x[:,:,:-2]
-            # print(x_hrv.shape,x.shape)
+        x_ibi_stat = x[:,:,-2:]
+        x = x[:,:,:-2]
         # BLSTM stream
         h0 = torch.zeros(self.num_layers*2, x.size(0), self.hidden_size).to(self.device)
         c0 = torch.zeros(self.num_layers*2, x.size(0), self.hidden_size).to(self.device)
@@ -68,7 +62,7 @@ class ERModel(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         # print(x.shape)
-        x = torch.cat((x, x_hrv.reshape(x_hrv.shape[0], -1)),1)
+        x = torch.cat((x, x_ibi_stat.reshape(x_ibi_stat.shape[0], -1)),1)
         # print(x.shape)
         x = self.fc3(x)
 
@@ -79,16 +73,15 @@ class ERonServer:
     def __init__(self):
         # init model
         num_classes = 3
-        self.input_size = 60000
+        self.input_size = 500
         hidden_size = 512
         num_layers = 2
         lr = 0.001
-        use_hrv = True
         device = torch.device("cpu")
-        self.model = ERModel(self.input_size, hidden_size, num_layers, num_classes, device, use_hrv).to(device)
+        self.model = ERModel(self.input_size, hidden_size, num_layers, num_classes, device).to(device)
         self.load_checkpoint(os.path.join('checkpoint/my_checkpoint.pth.tar'))
+        # init emotions & tags
         self.emotion = ['calmness', 'happiness', 'fear', 'sadness', 'anger', 'excitement']
-        # init tags
         self.tags = {}
         self.tags['calmness'] = ['acoustic guitar', 'ambient sounds', 'boring', 'calming', 'cleaning the house', 'driving', 'going to sleep', 'light', 'light beat', 'mellow', 'piano', 'relax']
         self.tags['happiness'] = ['cheerful', 'country', 'danceable', 'energy', 'hanging with friends', 'happy', 'jazz', 'lighthearted', 'minor', 'pleasant', 'romantic']
@@ -105,11 +98,20 @@ class ERonServer:
 
     def get_emo(self, filename):
         ecg = pd.read_csv(filename, index_col=False)
-        x = np.array([i for i in ecg['信号强度'] if i != 0])
-        x = (x-np.mean(x))/np.std(x)
-        x = torch.tensor([x,x])
-        x = torch.cat((x, torch.zeros(2, self.input_size - x.shape[1])),1)
-        ibi = np.array([i/256 for i in ecg['IBI'] if i != 0])
+        ibi = np.array(ecg['IBI'])
+        for i in range(len(ibi)):
+            if 550 < ibi[i] < 1200:
+                break
+        ibi = ibi[i:]/1000
+        ibi = [ibi[i] if 0.5<ibi[i]<1.2 else (ibi[i-1]+ibi[i]+ibi[(i+1)%len(ibi)])/3 for i in range(len(ibi))]
+        x = torch.tensor([ibi,ibi])
+        if x.shape[0] < self.input_size:
+            # cat
+            x = torch.cat((x, torch.zeros(2, self.input_size - x.shape[1])),1)
+        else:
+            # truncate
+            s = np.random.randint(x.shape[0]-self.input_size+1)
+            x = x[s:s+self.input_size]
         mean = np.mean(ibi)
         std = np.std(ibi)
         x = torch.cat((x, torch.tensor([[mean,std], [mean,std]])),1).unsqueeze(0).float()
@@ -162,12 +164,12 @@ if __name__ == "__main__":
     for i in range(len(emo)):
         emo_prob[model.emotion[i]] = emo[i]
     
-    f = open("ER_output.txt","w")
-    f.write("emotion:\n")
-    f.write(str(emo_prob)+"\n")
-    f.write("tags:\n")
-    f.write(str(tag)+"\n")
-    f.close()
+    with open("ER_output.txt","w") as f:
+        f = open("ER_output.txt","w")
+        f.write("emotion:\n")
+        f.write(str(emo_prob)+"\n")
+        f.write("tags:\n")
+        f.write(str(tag)+"\n")
 
     # test example
     # emo = model.get_emo("user_ecg/2022_5_18_13_49.csv")

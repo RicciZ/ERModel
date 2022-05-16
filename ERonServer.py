@@ -75,7 +75,7 @@ class ERonServer:
         num_classes = 3
         self.input_size = 500
         hidden_size = 512
-        num_layers = 2
+        num_layers = 6
         lr = 0.001
         device = torch.device("cpu")
         self.model = ERModel(self.input_size, hidden_size, num_layers, num_classes, device).to(device)
@@ -105,13 +105,13 @@ class ERonServer:
         ibi = ibi[i:]/1000
         ibi = [ibi[i] if 0.5<ibi[i]<1.2 else (ibi[i-1]+ibi[i]+ibi[(i+1)%len(ibi)])/3 for i in range(len(ibi))]
         x = torch.tensor([ibi,ibi])
-        if x.shape[0] < self.input_size:
+        if x.shape[1] < self.input_size:
             # cat
             x = torch.cat((x, torch.zeros(2, self.input_size - x.shape[1])),1)
         else:
             # truncate
-            s = np.random.randint(x.shape[0]-self.input_size+1)
-            x = x[s:s+self.input_size]
+            s = np.random.randint(x.shape[1]-self.input_size+1)
+            x = x[:,s:s+self.input_size]
         mean = np.mean(ibi)
         std = np.std(ibi)
         x = torch.cat((x, torch.tensor([[mean,std], [mean,std]])),1).unsqueeze(0).float()
